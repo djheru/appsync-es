@@ -48,6 +48,7 @@ export class MainStack extends cdk.Stack {
       partitionKey: { name: 'id', type: AttributeType.STRING },
       sortKey: { name: 'version', type: AttributeType.NUMBER },
       billingMode: BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
       timeToLiveAttribute: 'expires',
     });
     table.grantReadWriteData(lambdaResolver);
