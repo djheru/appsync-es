@@ -6,7 +6,7 @@ import { Construct } from 'constructs';
 import { join } from 'path';
 // import * as sqs from 'aws-cdk-lib/aws-sqs';
 
-export class AppsyncEsStack extends cdk.Stack {
+export class MainStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
