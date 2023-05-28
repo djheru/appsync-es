@@ -30,7 +30,7 @@ type Mutation {
 }
 
 type Subscription {
-  onCreateAccount: Account @aws_subscribe(mutations: ['createAccount'])
-  onCreditAccount: Account @aws_subscribe(mutations: ['creditAccount'])
-  onDebitAccount: Account @aws_subscribe(mutations: ['debitAccount'])
+  onCreateAccount: Account @aws_subscribe(mutations: ["createAccount"])
+  onCreditAccount: Account @aws_subscribe(mutations: ["creditAccount"])
+  onDebitAccount: Account @aws_subscribe(mutations: ["debitAccount"])
 }
