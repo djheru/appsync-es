@@ -1,0 +1,36 @@
+enum EventType {
+  CREATED
+  DEBITED
+  CREDITED
+}
+
+type Account {
+  id: ID!
+  version: Float!
+  timestamp: AWSDateTime!
+  auth0Id: String!
+  email: String!
+  availableTokens: Float!
+}
+
+type AccountConnection {
+  items: [Account!]!
+  nextToken: String
+}
+
+type Query {
+  getAccount(id: ID!): Account
+  listAccounts(limit: Int, nextToken: String): AccountConnection
+}
+
+type Mutation {
+  createAccount(auth0Id: String!, email: String!): Account
+  creditAccount(id: ID!, amount: Float!): Account
+  debitAccount(id: ID!, amount: Float!): Account
+}
+
+type Subscription {
+  onCreateAccount: Account @aws_subscribe(mutations: ['createAccount'])
+  onCreditAccount: Account @aws_subscribe(mutations: ['creditAccount'])
+  onDebitAccount: Account @aws_subscribe(mutations: ['debitAccount'])
+}
