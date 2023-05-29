@@ -52,6 +52,6 @@ export class MainStack extends cdk.Stack {
       timeToLiveAttribute: 'expires',
     });
     table.grantReadWriteData(lambdaResolver);
-
+    lambdaResolver.addEnvironment('TABLE_NAME', table.tableName);
   }
 }
