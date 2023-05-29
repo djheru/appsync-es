@@ -13,14 +13,8 @@ type Account {
   availableTokens: Float!
 }
 
-type AccountConnection {
-  items: [Account!]!
-  nextToken: String
-}
-
 type Query {
   getAccount(id: ID!): Account
-  listAccounts(limit: Int, nextToken: String): AccountConnection
 }
 
 type Mutation {
