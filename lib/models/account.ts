@@ -169,7 +169,12 @@ export const credit = async (event: CreditDebitAccountInputType, currentAccount:
   const updated = await get(event.id);
   return updated?.account;
 };
+
 export const debit = async (event: CreditDebitAccountInputType, currentAccount: Account, itemsSinceSnapshot: AccountEvent[]) => {
+  if (currentAccount.availableTokens < event.amount) {
+    throw new Error('Insufficient tokens for debit');
+  }
+  
   const transaction: DynamoDB.DocumentClient.TransactWriteItemsInput = {
     TransactItems: []
   };
@@ -189,7 +194,7 @@ export const debit = async (event: CreditDebitAccountInputType, currentAccount: 
     });
   }
 
-  const creditAccountEvent: DebitAccountEvent = {
+  const debitAccountEvent: DebitAccountEvent = {
     id: event.id,
     version: ++version,
     type: EventType.DEBITED,
@@ -201,7 +206,7 @@ export const debit = async (event: CreditDebitAccountInputType, currentAccount: 
     Put: {
       TableName,
       ConditionExpression: 'attribute_not_exists(version)',
-      Item: creditAccountEvent
+      Item: debitAccountEvent
     }
   });
 
