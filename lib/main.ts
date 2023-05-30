@@ -50,7 +50,7 @@ export class MainStack extends cdk.Stack {
           {
             authorizationType: AuthorizationType.OIDC,
             openIdConnectConfig: {
-              oidcProvider: 'https://dev-pdamra.auth0.com/',
+              oidcProvider: 'https://auth0.prosaist.io/',
 
             }
           }
