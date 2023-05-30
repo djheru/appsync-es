@@ -4,7 +4,7 @@ enum EventType {
   CREDITED
 }
 
-type Account @aws_api_key {
+type Account @aws_oidc @aws_api_key {
   id: ID!
   version: Float!
   timestamp: AWSDateTime!
