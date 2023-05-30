@@ -4,7 +4,7 @@ enum EventType {
   CREDITED
 }
 
-type Account {
+type Account @aws_api_key {
   id: ID!
   version: Float!
   timestamp: AWSDateTime!
@@ -14,13 +14,13 @@ type Account {
 }
 
 type Query {
-  getAccount(id: ID!): Account
+  getAccount(id: ID!): Account @aws_oidc @aws_api_key
 }
 
 type Mutation {
-  createAccount(auth0Id: String!, email: String!): Account
-  creditAccount(id: ID!, amount: Float!): Account
-  debitAccount(id: ID!, amount: Float!): Account
+  createAccount(auth0Id: String!, email: String!): Account @aws_oidc @aws_api_key
+  creditAccount(id: ID!, amount: Float!): Account @aws_oidc @aws_api_key
+  debitAccount(id: ID!, amount: Float!): Account @aws_oidc @aws_api_key
 }
 
 type Subscription {
