@@ -80,7 +80,7 @@ export class MainStack extends cdk.Stack {
         typeName, fieldName
       }));
 
-    new cdk.CfnOutput(this, 'graphqlUrl', { value: domainName });
+    new cdk.CfnOutput(this, 'graphqlUrl', { value: `${domainName}/graphql` });
     new cdk.CfnOutput(this, 'appsyncUrl', { value: api.graphqlUrl });
     if(api.apiKey){
       new cdk.CfnOutput(this, 'apiKey', { value: api.apiKey });
