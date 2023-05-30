@@ -14,7 +14,7 @@ const getAccount = async ({ id }: GetAccountInputType) => {
   console.log('getAccount: %j', id);
   const accountDetails = await get(id);
   console.log('getAccount: %j', accountDetails);
-  const { account = {} } = accountDetails || {};
+  const { account = null } = accountDetails || {};
   return account;
 };
 
