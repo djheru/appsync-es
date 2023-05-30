@@ -1,7 +1,9 @@
 import * as cdk from 'aws-cdk-lib';
 import { FieldLogLevel, GraphqlApi, SchemaFile } from 'aws-cdk-lib/aws-appsync';
+import { Certificate } from 'aws-cdk-lib/aws-certificatemanager';
 import { AttributeType, BillingMode, Table } from 'aws-cdk-lib/aws-dynamodb';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
+import { CnameRecord, HostedZone } from 'aws-cdk-lib/aws-route53';
 import { Construct } from 'constructs';
 import { join } from 'path';
 // import * as sqs from 'aws-cdk-lib/aws-sqs';
@@ -9,6 +11,10 @@ import { join } from 'path';
 export class MainStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
+
+    const domainName = 'api.dev.prosaist.io';
+    const certificate = new Certificate(this, 'cert', { domainName });
+
 
     const api = new GraphqlApi(this, 'api', {
       name: 'AccountsApi',
@@ -18,6 +24,21 @@ export class MainStack extends cdk.Stack {
         excludeVerboseContent: false,
         fieldLogLevel: FieldLogLevel.ALL,
       },
+      domainName: {
+        certificate,
+        domainName
+      }
+    });
+
+    const zone = HostedZone.fromLookup(this, 'hostedzone', {
+      domainName: domainName.split('.').slice(1).join('.'),
+      privateZone: false,
+    });
+
+    new CnameRecord(this, 'cname', {
+      recordName: 'api',
+      zone,
+      domainName: api.appSyncDomainName
     });
 
     const lambdaResolver = new NodejsFunction(this, 'resolver');
