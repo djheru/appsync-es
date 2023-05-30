@@ -64,7 +64,9 @@ export class MainStack extends cdk.Stack {
       domainName: api.appSyncDomainName
     });
 
-    const lambdaResolver = new NodejsFunction(this, 'resolver');
+    const lambdaResolver = new NodejsFunction(this, 'resolver', {
+      functionName: 'AccountResolver'
+    });
     const datasource = api.addLambdaDataSource('lambdaResolver', lambdaResolver);
     
     const fields = [

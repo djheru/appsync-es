@@ -110,7 +110,7 @@ export const create = async (id: string, input: CreateAccountInputType) => {
   transaction.TransactItems.push({
     Put: {
       TableName,
-      ConditionExpression: 'attribute_not_exists(id)',
+      ConditionExpression: 'attribute_not_exists(id) and attribute_not_exists(email)',
       Item: createEvent
     }
   });
