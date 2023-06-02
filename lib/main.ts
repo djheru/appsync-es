@@ -71,7 +71,6 @@ export class MainStack extends cdk.Stack {
     
     const fields = [
       { typeName: 'Query', fieldName: 'getAccount' },
-      { typeName: 'Query', fieldName: 'listAccounts' },
       { typeName: 'Mutation', fieldName: 'createAccount' },
       { typeName: 'Mutation', fieldName: 'creditAccount' },
       { typeName: 'Mutation', fieldName: 'debitAccount' },

@@ -1,4 +1,4 @@
-import { AppSyncResolverEvent } from 'aws-lambda';
+import { AppSyncResolverEvent, Context } from 'aws-lambda';
 import { ulid } from 'ulid';
 import { CreateAccountInputType, CreditDebitAccountInputType, GetAccountInputType, create, credit, debit, get } from './models/account';
 
@@ -50,8 +50,9 @@ const operations: { [key: string]: { [key: string]: Function } } = {
   Mutation: { createAccount, creditAccount, debitAccount }
 };
 
-exports.handler = async (event: AppSyncResolverEvent<{ [key: string]: string | number }>) => {
+exports.handler = async (event: AppSyncResolverEvent<{ [key: string]: string | number }>, ctx: Context) => {
   console.log('event: %j', event);
+  console.log('ctx: %j', ctx);
   const {
     arguments: args,
     info: { parentTypeName: typeName, fieldName }
