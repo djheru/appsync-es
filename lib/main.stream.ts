@@ -12,17 +12,21 @@ exports.handler = async (event: DynamoDBStreamEvent, ctx: Context) => {
   console.log('event: %j', event);
   console.log('ctx: %j', ctx);
 
-  const mappedEvents = event.Records.map((record: DynamoDBRecord) => ({
-    Detail: JSON.stringify(
-      unmarshall(
-        (record.dynamodb?.NewImage || {}) as Record<string, AttributeValue>,
-      ),
-    ),
-    DetailType: 'CREATED',
-    Source: 'myapp.accounts',
-    EventBusName: process.env.EVENT_BUS_NAME,
-    Resources: [record.eventSourceARN || ''],
-  }));
+  const mappedEvents = event.Records.map((record: DynamoDBRecord) => {
+    const data = unmarshall(
+      (record.dynamodb?.NewImage || {}) as Record<string, AttributeValue>,
+    );
+
+    console.log('Record data: %j', data);
+
+    return {
+      Detail: JSON.stringify(data),
+      DetailType: data.type,
+      Source: 'myapp.accounts',
+      EventBusName: process.env.EVENT_BUS_NAME,
+      Resources: [record.eventSourceARN || ''],
+    };
+  });
 
   console.log('mappedEvents: %j', mappedEvents);
 
