@@ -1,6 +1,14 @@
 import * as cdk from 'aws-cdk-lib';
-import { AuthorizationType, FieldLogLevel, GraphqlApi, SchemaFile } from 'aws-cdk-lib/aws-appsync';
-import { Certificate, CertificateValidation } from 'aws-cdk-lib/aws-certificatemanager';
+import {
+  AuthorizationType,
+  FieldLogLevel,
+  GraphqlApi,
+  SchemaFile,
+} from 'aws-cdk-lib/aws-appsync';
+import {
+  Certificate,
+  CertificateValidation,
+} from 'aws-cdk-lib/aws-certificatemanager';
 import { AttributeType, BillingMode, Table } from 'aws-cdk-lib/aws-dynamodb';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import { CnameRecord, HostedZone } from 'aws-cdk-lib/aws-route53';
@@ -18,13 +26,12 @@ export class MainStack extends cdk.Stack {
       domainName: domainName.split('.').slice(1).join('.'),
       privateZone: false,
     });
-    
-    const certificate = new Certificate(this, 'cert', { 
+
+    const certificate = new Certificate(this, 'cert', {
       domainName,
       certificateName: 'graphqlApiCertificate',
-      validation: CertificateValidation.fromDns(zone)
+      validation: CertificateValidation.fromDns(zone),
     });
-
 
     const api = new GraphqlApi(this, 'api', {
       name: 'AccountsApi',
@@ -36,39 +43,41 @@ export class MainStack extends cdk.Stack {
       },
       domainName: {
         certificate,
-        domainName
+        domainName,
       },
       authorizationConfig: {
         defaultAuthorization: {
           authorizationType: AuthorizationType.API_KEY,
           apiKeyConfig: {
             description: 'API Key',
-            expires: cdk.Expiration.after(cdk.Duration.days(365))
-          }
+            expires: cdk.Expiration.after(cdk.Duration.days(365)),
+          },
         },
         additionalAuthorizationModes: [
           {
             authorizationType: AuthorizationType.OIDC,
             openIdConnectConfig: {
               oidcProvider: 'https://auth0.prosaist.io/',
-
-            }
-          }
-        ]
-      }
+            },
+          },
+        ],
+      },
     });
 
     new CnameRecord(this, 'cname', {
       recordName: 'api',
       zone,
-      domainName: api.appSyncDomainName
+      domainName: api.appSyncDomainName,
     });
 
     const lambdaResolver = new NodejsFunction(this, 'resolver', {
-      functionName: 'AccountResolver'
+      functionName: 'AccountResolver',
     });
-    const datasource = api.addLambdaDataSource('lambdaResolver', lambdaResolver);
-    
+    const datasource = api.addLambdaDataSource(
+      'lambdaResolver',
+      lambdaResolver,
+    );
+
     const fields = [
       { typeName: 'Query', fieldName: 'getAccount' },
       { typeName: 'Mutation', fieldName: 'createAccount' },
@@ -76,14 +85,16 @@ export class MainStack extends cdk.Stack {
       { typeName: 'Mutation', fieldName: 'debitAccount' },
     ];
 
-    fields.forEach(({ typeName, fieldName }) => 
+    fields.forEach(({ typeName, fieldName }) =>
       datasource.createResolver(`${typeName}${fieldName}Resolver`, {
-        typeName, fieldName
-      }));
+        typeName,
+        fieldName,
+      }),
+    );
 
     new cdk.CfnOutput(this, 'graphqlUrl', { value: `${domainName}/graphql` });
     new cdk.CfnOutput(this, 'appsyncUrl', { value: api.graphqlUrl });
-    if(api.apiKey){
+    if (api.apiKey) {
       new cdk.CfnOutput(this, 'apiKey', { value: api.apiKey });
     }
     new cdk.CfnOutput(this, 'apiId', { value: api.apiId });
