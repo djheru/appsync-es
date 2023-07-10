@@ -29,6 +29,10 @@
     "typescript": "~5.0.4"
   },
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.363.0",
+    "@aws-sdk/client-eventbridge": "^3.363.0",
+    "@aws-sdk/lib-dynamodb": "^3.365.0",
+    "@aws-sdk/util-dynamodb": "^3.365.0",
     "aws-cdk-lib": "2.81.0",
     "constructs": "^10.0.0",
     "lodash": "^4.17.21",

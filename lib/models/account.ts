@@ -1,4 +1,10 @@
-import { DynamoDB } from 'aws-sdk';
+import { DynamoDBClient, QueryCommand } from '@aws-sdk/client-dynamodb';
+import {
+  DynamoDBDocumentClient,
+  TransactWriteCommand,
+  TransactWriteCommandInput,
+} from '@aws-sdk/lib-dynamodb';
+import { unmarshall } from '@aws-sdk/util-dynamodb';
 import * as https from 'https';
 import * as _ from 'lodash';
 
@@ -11,9 +17,8 @@ const agent = new https.Agent({
 });
 agent.setMaxListeners(0);
 
-const ddb = new DynamoDB.DocumentClient({
-  service: new DynamoDB({ httpOptions: { agent } }),
-});
+const client = new DynamoDBClient({});
+const ddb = DynamoDBDocumentClient.from(client);
 
 export enum EventType {
   CREATED = 'CREATED',
@@ -92,7 +97,7 @@ export type AccountEvent =
 export const create = async (id: string, input: CreateAccountInputType) => {
   const { auth0Id, email } = input;
 
-  const transaction: DynamoDB.DocumentClient.TransactWriteItemsInput = {
+  const transaction: TransactWriteCommandInput = {
     TransactItems: [],
   };
 
@@ -106,7 +111,7 @@ export const create = async (id: string, input: CreateAccountInputType) => {
     version: 1,
   };
 
-  transaction.TransactItems.push({
+  transaction.TransactItems?.push({
     Put: {
       TableName,
       ConditionExpression:
@@ -121,7 +126,7 @@ export const create = async (id: string, input: CreateAccountInputType) => {
     type: EventType.SNAPSHOT,
   };
 
-  transaction.TransactItems.push({
+  transaction.TransactItems?.push({
     Put: {
       TableName,
       ConditionExpression: 'attribute_not_exists(version)',
@@ -129,7 +134,9 @@ export const create = async (id: string, input: CreateAccountInputType) => {
     },
   });
 
-  await ddb.transactWrite(transaction).promise();
+  const command = new TransactWriteCommand(transaction);
+
+  await ddb.send(command);
   return accountSnapshot;
 };
 
@@ -138,14 +145,14 @@ export const credit = async (
   currentAccount: Account,
   itemsSinceSnapshot: AccountEvent[],
 ) => {
-  const transaction: DynamoDB.DocumentClient.TransactWriteItemsInput = {
+  const transaction: TransactWriteCommandInput = {
     TransactItems: [],
   };
 
   let version = currentAccount.version;
 
   if (itemsSinceSnapshot.length >= 9) {
-    transaction.TransactItems.push({
+    transaction.TransactItems?.push({
       Put: {
         TableName,
         ConditionExpression: 'attribute_not_exists(version)',
@@ -165,7 +172,7 @@ export const credit = async (
     timestamp: new Date().toJSON(),
   };
 
-  transaction.TransactItems.push({
+  transaction.TransactItems?.push({
     Put: {
       TableName,
       ConditionExpression: 'attribute_not_exists(version)',
@@ -173,7 +180,9 @@ export const credit = async (
     },
   });
 
-  await ddb.transactWrite(transaction).promise();
+  const command = new TransactWriteCommand(transaction);
+
+  await ddb.send(command);
   const updated = await get(event.id);
   return updated?.account;
 };
@@ -187,14 +196,14 @@ export const debit = async (
     throw new Error('Insufficient tokens for debit');
   }
 
-  const transaction: DynamoDB.DocumentClient.TransactWriteItemsInput = {
+  const transaction: TransactWriteCommandInput = {
     TransactItems: [],
   };
 
   let version = currentAccount.version;
 
   if (itemsSinceSnapshot.length >= 9) {
-    transaction.TransactItems.push({
+    transaction.TransactItems?.push({
       Put: {
         TableName,
         ConditionExpression: 'attribute_not_exists(version)',
@@ -214,7 +223,7 @@ export const debit = async (
     timestamp: new Date().toJSON(),
   };
 
-  transaction.TransactItems.push({
+  transaction.TransactItems?.push({
     Put: {
       TableName,
       ConditionExpression: 'attribute_not_exists(version)',
@@ -222,24 +231,27 @@ export const debit = async (
     },
   });
 
-  await ddb.transactWrite(transaction).promise();
+  const command = new TransactWriteCommand(transaction);
+
+  await ddb.send(command);
   const updated = await get(event.id);
   return updated?.account;
 };
 
 export const get = async (id: string) => {
-  const stream = await ddb
-    .query({
-      TableName,
-      KeyConditionExpression: 'id = :id',
-      ExpressionAttributeValues: { ':id': id },
-      ConsistentRead: true,
-      Limit: 10,
-      ScanIndexForward: false, // most recent first
-    })
-    .promise();
+  const command = new QueryCommand({
+    TableName,
+    KeyConditionExpression: 'id = :id',
+    ExpressionAttributeValues: { ':id': { S: id } },
+    ConsistentRead: true,
+    Limit: 10,
+    ScanIndexForward: false, // most recent first
+  });
+  const stream = await ddb.send(command);
 
-  const items = stream.Items as AccountEvent[];
+  const items = (stream.Items || []).map((item) =>
+    unmarshall(item),
+  ) as AccountEvent[];
 
   if (!items || !items.length) {
     console.log(`Account ID ${id} not found`);
