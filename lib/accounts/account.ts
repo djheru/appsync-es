@@ -27,7 +27,7 @@ import { join } from 'path';
 import { EventType } from './models/account';
 // import * as sqs from 'aws-cdk-lib/aws-sqs';
 
-export class MainStack extends cdk.Stack {
+export class AccountStack extends cdk.Stack {
   public eventBus: EventBus;
 
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
