@@ -1,9 +1,3 @@
-enum EventType {
-  CREATED
-  DEBITED
-  CREDITED
-}
-
 type Account @aws_oidc @aws_api_key {
   id: ID!
   version: Float!

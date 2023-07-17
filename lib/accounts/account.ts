@@ -1,14 +1,5 @@
-import * as cdk from 'aws-cdk-lib';
-import {
-  AuthorizationType,
-  FieldLogLevel,
-  GraphqlApi,
-  SchemaFile,
-} from 'aws-cdk-lib/aws-appsync';
-import {
-  Certificate,
-  CertificateValidation,
-} from 'aws-cdk-lib/aws-certificatemanager';
+import { CfnOutput, RemovalPolicy, Stack, StackProps } from 'aws-cdk-lib';
+import { GraphqlApi } from 'aws-cdk-lib/aws-appsync';
 import {
   AttributeType,
   BillingMode,
@@ -20,74 +11,29 @@ import { LambdaFunction } from 'aws-cdk-lib/aws-events-targets';
 import { StartingPosition } from 'aws-cdk-lib/aws-lambda';
 import { DynamoEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
-import { CnameRecord, HostedZone } from 'aws-cdk-lib/aws-route53';
 import { Construct } from 'constructs';
 import { camelCase, lowerCase } from 'lodash';
-import { join } from 'path';
 import { EventType } from './models/account';
 // import * as sqs from 'aws-cdk-lib/aws-sqs';
 
-export class AccountStack extends cdk.Stack {
+export interface AccountStackProps extends StackProps {
+  appsyncApi: GraphqlApi;
+}
+export class AccountStack extends Stack {
   public eventBus: EventBus;
 
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+  constructor(
+    scope: Construct,
+    id: string,
+    private readonly props: AccountStackProps,
+  ) {
     super(scope, id, props);
-
-    const domainName = 'api.dev.prosaist.io';
-
-    const zone = HostedZone.fromLookup(this, 'hostedzone', {
-      domainName: domainName.split('.').slice(1).join('.'),
-      privateZone: false,
-    });
-
-    const certificate = new Certificate(this, 'cert', {
-      domainName,
-      certificateName: 'graphqlApiCertificate',
-      validation: CertificateValidation.fromDns(zone),
-    });
-
-    const api = new GraphqlApi(this, 'api', {
-      name: 'AccountsApi',
-      schema: SchemaFile.fromAsset(join(__dirname, 'schema.graphql')),
-      xrayEnabled: true,
-      logConfig: {
-        excludeVerboseContent: false,
-        fieldLogLevel: FieldLogLevel.ALL,
-      },
-      domainName: {
-        certificate,
-        domainName,
-      },
-      authorizationConfig: {
-        defaultAuthorization: {
-          authorizationType: AuthorizationType.API_KEY,
-          apiKeyConfig: {
-            description: 'API Key',
-            expires: cdk.Expiration.after(cdk.Duration.days(365)),
-          },
-        },
-        additionalAuthorizationModes: [
-          {
-            authorizationType: AuthorizationType.OIDC,
-            openIdConnectConfig: {
-              oidcProvider: 'https://auth0.prosaist.io/',
-            },
-          },
-        ],
-      },
-    });
-
-    new CnameRecord(this, 'cname', {
-      recordName: 'api',
-      zone,
-      domainName: api.appSyncDomainName,
-    });
 
     const lambdaResolver = new NodejsFunction(this, 'resolver', {
       functionName: 'AccountResolver',
     });
 
-    const datasource = api.addLambdaDataSource(
+    const datasource = this.props.appsyncApi.addLambdaDataSource(
       'lambdaResolver',
       lambdaResolver,
     );
@@ -115,7 +61,7 @@ export class AccountStack extends cdk.Stack {
       partitionKey: { name: 'id', type: AttributeType.STRING },
       sortKey: { name: 'version', type: AttributeType.NUMBER },
       billingMode: BillingMode.PAY_PER_REQUEST,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      removalPolicy: RemovalPolicy.DESTROY,
       timeToLiveAttribute: 'expires',
       stream: StreamViewType.NEW_IMAGE,
     });
@@ -140,13 +86,7 @@ export class AccountStack extends cdk.Stack {
     this.buildConsumer('AccountCredited', EventType.CREDITED);
     this.buildConsumer('AccountDebited', EventType.DEBITED);
 
-    new cdk.CfnOutput(this, 'graphqlUrl', { value: `${domainName}/graphql` });
-    new cdk.CfnOutput(this, 'appsyncUrl', { value: api.graphqlUrl });
-    if (api.apiKey) {
-      new cdk.CfnOutput(this, 'apiKey', { value: api.apiKey });
-    }
-    new cdk.CfnOutput(this, 'apiId', { value: api.apiId });
-    new cdk.CfnOutput(this, 'lambda', { value: lambdaResolver.functionArn });
+    new CfnOutput(this, 'lambda', { value: lambdaResolver.functionArn });
   }
 
   buildConsumer(functionName: string, eventType: EventType) {

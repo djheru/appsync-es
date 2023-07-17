@@ -36,6 +36,10 @@ export class PipelineStack extends Stack {
       }),
     });
 
-    pipeline.addStage(new Application(this, 'Application'));
+    pipeline.addStage(
+      new Application(this, 'Application', {
+        env: this.props.env,
+      }),
+    );
   }
 }
