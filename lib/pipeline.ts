@@ -24,7 +24,16 @@ export class PipelineStack extends Stack {
     super(scope, id, props);
 
     const pipeline = new CodePipeline(this, 'Pipeline', {
+      pipelineName: 'AppsyncESPipeline',
       synth: new ShellStep('Synth', {
+        env: {
+          CDK_DEFAULT_ACCOUNT: this.account,
+          CDK_DEFAULT_REGION: this.region,
+          CODESTAR_CONNECTION_ARN: this.props.codestarConnectionArn,
+          ENV: this.props.environmentName,
+          GITHUB_OWNER: this.props.githubOwner,
+          GITHUB_REPO: this.props.githubRepo,
+        },
         input: CodePipelineSource.connection(
           `${this.props.githubOwner}/${this.props.githubRepo}`,
           this.props.branchName,
