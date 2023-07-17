@@ -77,6 +77,7 @@ export class ApiStack extends Stack {
       recordName: 'api',
       zone,
       domainName: this.api.appSyncDomainName,
+      ttl: Duration.seconds(60),
     });
 
     new CfnOutput(this, 'apiId', { value: this.api.apiId });
