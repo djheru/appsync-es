@@ -1,24 +1,10 @@
-import { DynamoDBClient, QueryCommand } from '@aws-sdk/client-dynamodb';
-import {
-  DynamoDBDocumentClient,
-  TransactWriteCommand,
-  TransactWriteCommandInput,
-} from '@aws-sdk/lib-dynamodb';
-import { unmarshall } from '@aws-sdk/util-dynamodb';
-import * as https from 'https';
 import * as _ from 'lodash';
-
-const { TABLE_NAME: TableName = '' } = process.env;
-
-const agent = new https.Agent({
-  keepAlive: true,
-  maxSockets: 50,
-  rejectUnauthorized: true,
-});
-agent.setMaxListeners(0);
-
-const client = new DynamoDBClient({});
-const ddb = DynamoDBDocumentClient.from(client);
+import {
+  createAccount,
+  creditAccount,
+  debitAccount,
+  getAccountEvents,
+} from '../repository/account';
 
 export enum EventType {
   CREATED = 'CREATED',
@@ -97,10 +83,6 @@ export type AccountEvent =
 export const create = async (id: string, input: CreateAccountInputType) => {
   const { auth0Id, email } = input;
 
-  const transaction: TransactWriteCommandInput = {
-    TransactItems: [],
-  };
-
   const createEvent: CreateAccountEvent = {
     auth0Id,
     availableTokens: 1,
@@ -110,61 +92,28 @@ export const create = async (id: string, input: CreateAccountInputType) => {
     type: EventType.CREATED,
     version: 1,
   };
-
-  transaction.TransactItems?.push({
-    Put: {
-      TableName,
-      ConditionExpression:
-        'attribute_not_exists(id) and attribute_not_exists(email)',
-      Item: createEvent,
-    },
-  });
-
-  const accountSnapshot: AccountSnapshotEvent = {
-    ...createEvent,
-    version: 2,
-    type: EventType.SNAPSHOT,
-  };
-
-  transaction.TransactItems?.push({
-    Put: {
-      TableName,
-      ConditionExpression: 'attribute_not_exists(version)',
-      Item: accountSnapshot,
-    },
-  });
-
-  const command = new TransactWriteCommand(transaction);
-
-  await ddb.send(command);
+  const accountSnapshot = await createAccount(createEvent);
   return accountSnapshot;
 };
 
-export const credit = async (
-  event: CreditDebitAccountInputType,
-  currentAccount: Account,
-  itemsSinceSnapshot: AccountEvent[],
-) => {
-  const transaction: TransactWriteCommandInput = {
-    TransactItems: [],
-  };
-
+export const credit = async (event: CreditDebitAccountInputType) => {
+  const accountDetails = await get(event.id);
+  if (!accountDetails) {
+    return null;
+  }
+  const { account: currentAccount, itemsSinceSnapshot } = accountDetails;
   let version = currentAccount.version;
+  let snapshotEvent;
 
   if (itemsSinceSnapshot.length >= 9) {
-    transaction.TransactItems?.push({
-      Put: {
-        TableName,
-        ConditionExpression: 'attribute_not_exists(version)',
-        Item: {
-          ...currentAccount,
-          version: ++version,
-        },
-      },
-    });
+    snapshotEvent = {
+      ...currentAccount,
+      version: ++version,
+      type: EventType.SNAPSHOT,
+    } as AccountSnapshotEvent;
   }
 
-  const creditAccountEvent: CreditAccountEvent = {
+  const creditEvent: CreditAccountEvent = {
     id: event.id,
     version: ++version,
     type: EventType.CREDITED,
@@ -172,50 +121,35 @@ export const credit = async (
     timestamp: new Date().toJSON(),
   };
 
-  transaction.TransactItems?.push({
-    Put: {
-      TableName,
-      ConditionExpression: 'attribute_not_exists(version)',
-      Item: creditAccountEvent,
-    },
-  });
+  await creditAccount(creditEvent, snapshotEvent);
 
-  const command = new TransactWriteCommand(transaction);
-
-  await ddb.send(command);
-  const updated = await get(event.id);
-  return updated?.account;
+  const updatedAccount = get(event.id);
+  return updatedAccount;
 };
 
-export const debit = async (
-  event: CreditDebitAccountInputType,
-  currentAccount: Account,
-  itemsSinceSnapshot: AccountEvent[],
-) => {
+export const debit = async (event: CreditDebitAccountInputType) => {
+  const accountDetails = await get(event.id);
+  if (!accountDetails) {
+    return null;
+  }
+  const { account: currentAccount, itemsSinceSnapshot } = accountDetails;
+
   if (currentAccount.availableTokens < event.amount) {
     throw new Error('Insufficient tokens for debit');
   }
 
-  const transaction: TransactWriteCommandInput = {
-    TransactItems: [],
-  };
-
   let version = currentAccount.version;
+  let snapshotEvent;
 
   if (itemsSinceSnapshot.length >= 9) {
-    transaction.TransactItems?.push({
-      Put: {
-        TableName,
-        ConditionExpression: 'attribute_not_exists(version)',
-        Item: {
-          ...currentAccount,
-          version: ++version,
-        },
-      },
-    });
+    snapshotEvent = {
+      ...currentAccount,
+      version: ++version,
+      type: EventType.SNAPSHOT,
+    } as AccountSnapshotEvent;
   }
 
-  const debitAccountEvent: DebitAccountEvent = {
+  const debitEvent: DebitAccountEvent = {
     id: event.id,
     version: ++version,
     type: EventType.DEBITED,
@@ -223,40 +157,14 @@ export const debit = async (
     timestamp: new Date().toJSON(),
   };
 
-  transaction.TransactItems?.push({
-    Put: {
-      TableName,
-      ConditionExpression: 'attribute_not_exists(version)',
-      Item: debitAccountEvent,
-    },
-  });
+  await debitAccount(debitEvent, snapshotEvent);
 
-  const command = new TransactWriteCommand(transaction);
-
-  await ddb.send(command);
-  const updated = await get(event.id);
-  return updated?.account;
+  const updatedAccount = get(event.id);
+  return updatedAccount;
 };
 
 export const get = async (id: string) => {
-  const command = new QueryCommand({
-    TableName,
-    KeyConditionExpression: 'id = :id',
-    ExpressionAttributeValues: { ':id': { S: id } },
-    ConsistentRead: true,
-    Limit: 10,
-    ScanIndexForward: false, // most recent first
-  });
-  const stream = await ddb.send(command);
-
-  const items = (stream.Items || []).map((item) =>
-    unmarshall(item),
-  ) as AccountEvent[];
-
-  if (!items || !items.length) {
-    console.log(`Account ID ${id} not found`);
-    return null;
-  }
+  const items = await getAccountEvents(id);
 
   const snapshotIdx = items?.findIndex(
     (item) => item.type === EventType.SNAPSHOT,

@@ -29,26 +29,14 @@ const getAccount = async ({ id }: GetAccountInputType) => {
 
 const creditAccount = async ({ id, amount }: CreditDebitAccountInputType) => {
   console.log('creditAccount: %j', { id, amount });
-  const accountDetails = await get(id);
-  if (!accountDetails) {
-    return null;
-  }
-  const { account, itemsSinceSnapshot } = accountDetails;
 
-  const updated = await credit({ id, amount }, account, itemsSinceSnapshot);
+  const updated = await credit({ id, amount });
   console.log('updated: %j', updated);
   return updated || null;
 };
 
 const debitAccount = async ({ id, amount }: CreditDebitAccountInputType) => {
-  console.log('debitAccount: %j', { id, amount });
-  const accountDetails = await get(id);
-  if (!accountDetails) {
-    return null;
-  }
-  const { account, itemsSinceSnapshot } = accountDetails;
-
-  const updated = await debit({ id, amount }, account, itemsSinceSnapshot);
+  const updated = await debit({ id, amount });
   console.log('updated: %j', updated);
   return updated || null;
 };
