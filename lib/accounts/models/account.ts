@@ -92,8 +92,9 @@ export const create = async (id: string, input: CreateAccountInputType) => {
     type: EventType.CREATED,
     version: 1,
   };
-  const accountSnapshot = await createAccount(createEvent);
-  return accountSnapshot;
+  await createAccount(createEvent);
+  const account = await get(id);
+  return account;
 };
 
 export const credit = async (event: CreditDebitAccountInputType) => {
@@ -123,7 +124,7 @@ export const credit = async (event: CreditDebitAccountInputType) => {
 
   await creditAccount(creditEvent, snapshotEvent);
 
-  const updatedAccount = get(event.id);
+  const updatedAccount = await get(event.id);
   return updatedAccount;
 };
 
@@ -159,7 +160,7 @@ export const debit = async (event: CreditDebitAccountInputType) => {
 
   await debitAccount(debitEvent, snapshotEvent);
 
-  const updatedAccount = get(event.id);
+  const updatedAccount = await get(event.id);
   return updatedAccount;
 };
 
