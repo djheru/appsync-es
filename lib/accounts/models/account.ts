@@ -93,7 +93,7 @@ export const create = async (id: string, input: CreateAccountInputType) => {
     version: 1,
   };
   await createAccount(createEvent);
-  const account = await get(id);
+  const { account } = await get(id);
   return account;
 };
 
@@ -124,8 +124,8 @@ export const credit = async (event: CreditDebitAccountInputType) => {
 
   await creditAccount(creditEvent, snapshotEvent);
 
-  const updatedAccount = await get(event.id);
-  return updatedAccount;
+  const { account } = await get(event.id);
+  return account;
 };
 
 export const debit = async (event: CreditDebitAccountInputType) => {
@@ -160,8 +160,8 @@ export const debit = async (event: CreditDebitAccountInputType) => {
 
   await debitAccount(debitEvent, snapshotEvent);
 
-  const updatedAccount = await get(event.id);
-  return updatedAccount;
+  const { account } = await get(event.id);
+  return account;
 };
 
 export const get = async (id: string) => {
@@ -173,8 +173,9 @@ export const get = async (id: string) => {
   const snapshot = items[snapshotIdx] as Account;
 
   if (!snapshot) {
-    console.log(`Account ID ${id} not found`);
-    return null;
+    const errorMsg = `Account ID ${id} not found`;
+    console.log(errorMsg);
+    throw new Error(errorMsg);
   }
 
   const itemsSinceSnapshot: AccountEvent[] = _.reverse(
