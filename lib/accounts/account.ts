@@ -1,5 +1,5 @@
 import { CfnOutput, RemovalPolicy, Stack, StackProps } from 'aws-cdk-lib';
-import { GraphqlApi } from 'aws-cdk-lib/aws-appsync';
+import { GraphqlApi, LambdaDataSource } from 'aws-cdk-lib/aws-appsync';
 import {
   AttributeType,
   BillingMode,
@@ -12,7 +12,7 @@ import { StartingPosition } from 'aws-cdk-lib/aws-lambda';
 import { DynamoEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import { Construct } from 'constructs';
-import { camelCase, lowerCase } from 'lodash';
+import { camelCase, kebabCase, lowerCase } from 'lodash';
 import { EventType } from './models/account';
 // import * as sqs from 'aws-cdk-lib/aws-sqs';
 
@@ -21,6 +21,10 @@ export interface AccountStackProps extends StackProps {
 }
 export class AccountStack extends Stack {
   public eventBus: EventBus;
+  public lambdaResolver: NodejsFunction;
+  public datasource: LambdaDataSource;
+  public streamHandler: NodejsFunction;
+  public table: Table;
 
   constructor(
     scope: Construct,
@@ -29,13 +33,33 @@ export class AccountStack extends Stack {
   ) {
     super(scope, id, props);
 
-    const lambdaResolver = new NodejsFunction(this, 'resolver', {
+    this.buildLambdaResolver();
+    this.buildLambdaDataSource();
+    this.buildStreamHandler();
+    this.buildTable('Accounts');
+    this.buildEventBus('AccountEvents');
+    this.buildConsumer('AccountCreated', EventType.CREATED);
+    this.buildConsumer('AccountCredited', EventType.CREDITED);
+    this.buildConsumer('AccountDebited', EventType.DEBITED);
+  }
+
+  buildEventBus(eventBusName: string) {
+    this.eventBus = new EventBus(this, eventBusName, {
+      eventBusName,
+    });
+  }
+
+  buildLambdaResolver() {
+    this.lambdaResolver = new NodejsFunction(this, 'resolver', {
       functionName: 'AccountResolver',
     });
+    new CfnOutput(this, 'resolver', { value: this.lambdaResolver.functionArn });
+  }
 
-    const datasource = this.props.appsyncApi.addLambdaDataSource(
+  buildLambdaDataSource() {
+    this.datasource = this.props.appsyncApi.addLambdaDataSource(
       'lambdaResolver',
-      lambdaResolver,
+      this.lambdaResolver,
     );
 
     const fields = [
@@ -46,18 +70,16 @@ export class AccountStack extends Stack {
     ];
 
     fields.forEach(({ typeName, fieldName }) =>
-      datasource.createResolver(`${typeName}${fieldName}Resolver`, {
+      this.datasource.createResolver(`${typeName}${fieldName}Resolver`, {
         typeName,
         fieldName,
       }),
     );
+  }
 
-    const streamHandler = new NodejsFunction(this, 'stream', {
-      functionName: 'StreamHandler',
-    });
-
-    const table = new Table(this, 'Table', {
-      tableName: 'Accounts',
+  buildTable(tableName: string) {
+    this.table = new Table(this, `${camelCase(tableName)}Table`, {
+      tableName,
       partitionKey: { name: 'id', type: AttributeType.STRING },
       sortKey: { name: 'version', type: AttributeType.NUMBER },
       billingMode: BillingMode.PAY_PER_REQUEST,
@@ -65,33 +87,34 @@ export class AccountStack extends Stack {
       timeToLiveAttribute: 'expires',
       stream: StreamViewType.NEW_IMAGE,
     });
-    table.grantReadWriteData(lambdaResolver);
-    lambdaResolver.addEnvironment('TABLE_NAME', table.tableName);
-    streamHandler.addEnvironment('TABLE_NAME', table.tableName);
+    this.table.grantReadWriteData(this.lambdaResolver);
+    this.lambdaResolver.addEnvironment('TABLE_NAME', this.table.tableName);
+    this.streamHandler.addEnvironment('TABLE_NAME', this.table.tableName);
+  }
 
-    this.eventBus = new EventBus(this, 'AccountEvents', {
-      eventBusName: 'AccountEvents',
+  buildStreamHandler(functionName: string) {
+    this.streamHandler = new NodejsFunction(this, lowerCase(functionName), {
+      functionName,
     });
-    this.eventBus.grantPutEventsTo(streamHandler);
-    streamHandler.addEnvironment('EVENT_BUS_NAME', this.eventBus.eventBusName);
+    this.eventBus.grantPutEventsTo(this.streamHandler);
+    this.streamHandler.addEnvironment(
+      'EVENT_BUS_NAME',
+      this.eventBus.eventBusName,
+    );
 
-    streamHandler.addEventSource(
-      new DynamoEventSource(table, {
+    this.streamHandler.addEventSource(
+      new DynamoEventSource(this.table, {
         startingPosition: StartingPosition.LATEST,
         batchSize: 10,
       }),
     );
-
-    this.buildConsumer('AccountCreated', EventType.CREATED);
-    this.buildConsumer('AccountCredited', EventType.CREDITED);
-    this.buildConsumer('AccountDebited', EventType.DEBITED);
-
-    new CfnOutput(this, 'lambda', { value: lambdaResolver.functionArn });
+    new CfnOutput(this, 'stream', { value: this.streamHandler.functionArn });
   }
 
   buildConsumer(functionName: string, eventType: EventType) {
     const consumer = new NodejsFunction(this, lowerCase(eventType), {
       functionName: `${functionName}Consumer`,
+      entry: `events/${kebabCase(eventType)}.ts`,
     });
 
     const accountEventRule = new Rule(this, `${camelCase(eventType)}Rule`, {
@@ -103,5 +126,8 @@ export class AccountStack extends Stack {
       eventBus: this.eventBus,
     });
     accountEventRule.addTarget(new LambdaFunction(consumer));
+    new CfnOutput(this, `${lowerCase(eventType)}-consumer`, {
+      value: consumer.functionArn,
+    });
   }
 }
