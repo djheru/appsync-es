@@ -33,9 +33,13 @@ export class AccountStack extends Stack {
   ) {
     super(scope, id, props);
 
-    this.buildLambdaResolver();
-    this.buildLambdaDataSource();
-    this.buildStreamHandler();
+    this.buildResources();
+  }
+
+  buildResources() {
+    this.buildLambdaResolver('AccountResolver');
+    this.buildLambdaDataSource('LambdaResolver');
+    this.buildStreamHandler('StreamHandler');
     this.buildTable('Accounts');
     this.buildEventBus('AccountEvents');
     this.buildConsumer('AccountCreated', EventType.CREATED);
@@ -49,16 +53,18 @@ export class AccountStack extends Stack {
     });
   }
 
-  buildLambdaResolver() {
-    this.lambdaResolver = new NodejsFunction(this, 'resolver', {
-      functionName: 'AccountResolver',
+  buildLambdaResolver(functionName: string) {
+    this.lambdaResolver = new NodejsFunction(this, lowerCase(functionName), {
+      functionName,
     });
-    new CfnOutput(this, 'resolver', { value: this.lambdaResolver.functionArn });
+    new CfnOutput(this, lowerCase(functionName), {
+      value: this.lambdaResolver.functionArn,
+    });
   }
 
-  buildLambdaDataSource() {
+  buildLambdaDataSource(datasourceName: string) {
     this.datasource = this.props.appsyncApi.addLambdaDataSource(
-      'lambdaResolver',
+      datasourceName,
       this.lambdaResolver,
     );
 
@@ -108,7 +114,9 @@ export class AccountStack extends Stack {
         batchSize: 10,
       }),
     );
-    new CfnOutput(this, 'stream', { value: this.streamHandler.functionArn });
+    new CfnOutput(this, lowerCase(functionName), {
+      value: this.streamHandler.functionArn,
+    });
   }
 
   buildConsumer(functionName: string, eventType: EventType) {
