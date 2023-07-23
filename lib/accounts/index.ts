@@ -56,6 +56,7 @@ export class AccountStack extends Stack {
   buildLambdaResolver(functionName: string) {
     this.lambdaResolver = new NodejsFunction(this, lowerCase(functionName), {
       functionName,
+      entry: 'resolver.ts',
     });
     new CfnOutput(this, lowerCase(functionName), {
       value: this.lambdaResolver.functionArn,
@@ -101,6 +102,7 @@ export class AccountStack extends Stack {
   buildStreamHandler(functionName: string) {
     this.streamHandler = new NodejsFunction(this, lowerCase(functionName), {
       functionName,
+      entry: './stream.ts',
     });
     this.eventBus.grantPutEventsTo(this.streamHandler);
     this.streamHandler.addEnvironment(
