@@ -38,11 +38,11 @@ export class AccountStack extends Stack {
   }
 
   buildResources() {
+    this.buildEventBus('AccountEvents');
     this.buildLambdaResolver('AccountResolver');
     this.buildLambdaDataSource('LambdaResolver');
-    this.buildStreamHandler('StreamHandler');
     this.buildTable('Accounts');
-    this.buildEventBus('AccountEvents');
+    this.buildStreamHandler('StreamHandler');
     this.buildConsumer('AccountCreated', EventType.CREATED);
     this.buildConsumer('AccountCredited', EventType.CREDITED);
     this.buildConsumer('AccountDebited', EventType.DEBITED);
@@ -97,7 +97,6 @@ export class AccountStack extends Stack {
     });
     this.table.grantReadWriteData(this.lambdaResolver);
     this.lambdaResolver.addEnvironment('TABLE_NAME', this.table.tableName);
-    this.streamHandler.addEnvironment('TABLE_NAME', this.table.tableName);
   }
 
   buildStreamHandler(functionName: string) {
@@ -118,6 +117,9 @@ export class AccountStack extends Stack {
         batchSize: 10,
       }),
     );
+
+    this.streamHandler.addEnvironment('TABLE_NAME', this.table.tableName);
+
     new CfnOutput(this, upperCase(functionName), {
       value: this.streamHandler.functionArn,
     });
