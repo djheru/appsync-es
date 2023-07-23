@@ -16,4 +16,4 @@ The `cdk.json` file tells the CDK Toolkit how to execute your app.
 curl --request POST \
  --url https://auth0.prosaist.io/oauth/token \
  --header 'content-type: application/json' \
- --data '{"client_id":"$CLIENT_ID","client_secret":"$CLIENT_SECRET","audience":"https://dev.prosaist.io/","grant_type":"client_credentials"}'
+ --data '{"client_id":"$PROSAIST_CLIENT_ID","client_secret":"$PROSAIST_CLIENT_SECRET","audience":"https://dev.prosaist.io/","grant_type":"client_credentials"}'
