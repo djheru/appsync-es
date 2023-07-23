@@ -72,6 +72,7 @@ export class AccountStack extends Stack {
 
     const fields = [
       { typeName: 'Query', fieldName: 'getAccount' },
+      { typeName: 'Query', fieldName: 'getAccountList' },
       { typeName: 'Mutation', fieldName: 'createAccount' },
       { typeName: 'Mutation', fieldName: 'creditAccount' },
       { typeName: 'Mutation', fieldName: 'debitAccount' },

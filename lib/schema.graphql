@@ -7,8 +7,22 @@ type Account @aws_oidc @aws_api_key {
   availableTokens: Float!
 }
 
+type AccountListItem @aws_oidc @aws_api_key {
+  auth0Id: String!
+  email: String!
+  id: ID!
+}
+
+type AccountList @aws_oidc @aws_api_key {
+  accounts: [AccountListItem]
+  nextToken: String
+}
+
 type Query {
   getAccount(id: ID!): Account @aws_oidc @aws_api_key
+  getAccountList(nextToken: String, pageSize: Int): AccountList
+    @aws_oidc
+    @aws_api_key
 }
 
 type Mutation {

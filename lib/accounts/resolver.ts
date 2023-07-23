@@ -4,10 +4,12 @@ import {
   CreateAccountInputType,
   CreditDebitAccountInputType,
   GetAccountInputType,
+  GetAccountListInputType,
   create,
   credit,
   debit,
   get,
+  getAccounts,
 } from './models/account';
 
 const createAccount = async ({ auth0Id, email }: CreateAccountInputType) => {
@@ -25,6 +27,15 @@ const getAccount = async ({ id }: GetAccountInputType) => {
 
   console.log('getAccount: %j', account);
   return account;
+};
+
+const getAccountList = async ({
+  nextToken,
+  pageSize,
+}: GetAccountListInputType) => {
+  console.log('getAccountList: %j', { nextToken, pageSize });
+  const result = await getAccounts({ nextToken, pageSize });
+  return result;
 };
 
 const creditAccount = async ({ id, amount }: CreditDebitAccountInputType) => {
@@ -46,7 +57,10 @@ const debitAccount = async ({ id, amount }: CreditDebitAccountInputType) => {
 type OperationFunction = (data: Record<string, unknown>) => Promise<unknown>;
 
 const operations: { [key: string]: { [key: string]: OperationFunction } } = {
-  Query: { getAccount: getAccount as OperationFunction },
+  Query: {
+    getAccount: getAccount as OperationFunction,
+    getAccountList: getAccountList as OperationFunction,
+  },
 
   Mutation: {
     createAccount: createAccount as OperationFunction,

@@ -4,6 +4,7 @@ import {
   creditAccount,
   debitAccount,
   getAccountEvents,
+  getAccountList,
 } from '../repository/account';
 
 export enum EventType {
@@ -22,8 +23,18 @@ export type Account = {
   version: number;
 };
 
+export type AccountListItemType = {
+  auth0Id: string;
+  email: string;
+  id: string;
+};
+
 export type GetAccountInputType = {
   id: string;
+};
+export type GetAccountListInputType = {
+  nextToken: string;
+  pageSize: number;
 };
 export type ListAccountsInputType = {
   limit?: number;
@@ -162,6 +173,15 @@ export const debit = async (event: CreditDebitAccountInputType) => {
 
   const { account } = await get(event.id);
   return account;
+};
+
+export const getAccounts = async ({
+  pageSize,
+  nextToken,
+}: GetAccountListInputType) => {
+  const result = await getAccountList(pageSize, nextToken);
+  console.log('getAccounts result: %j', result);
+  return result;
 };
 
 export const get = async (id: string) => {
