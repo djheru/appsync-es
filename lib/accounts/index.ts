@@ -12,7 +12,8 @@ import { StartingPosition } from 'aws-cdk-lib/aws-lambda';
 import { DynamoEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import { Construct } from 'constructs';
-import { camelCase, kebabCase, lowerCase } from 'lodash';
+import { camelCase, kebabCase, lowerCase, upperCase } from 'lodash';
+import { join } from 'path';
 import { EventType } from './models/account';
 // import * as sqs from 'aws-cdk-lib/aws-sqs';
 
@@ -56,9 +57,9 @@ export class AccountStack extends Stack {
   buildLambdaResolver(functionName: string) {
     this.lambdaResolver = new NodejsFunction(this, lowerCase(functionName), {
       functionName,
-      entry: 'resolver.ts',
+      entry: join(__dirname, 'resolver.ts'),
     });
-    new CfnOutput(this, lowerCase(functionName), {
+    new CfnOutput(this, upperCase(functionName), {
       value: this.lambdaResolver.functionArn,
     });
   }
@@ -102,8 +103,9 @@ export class AccountStack extends Stack {
   buildStreamHandler(functionName: string) {
     this.streamHandler = new NodejsFunction(this, lowerCase(functionName), {
       functionName,
-      entry: './stream.ts',
+      entry: join(__dirname, 'stream.ts'),
     });
+
     this.eventBus.grantPutEventsTo(this.streamHandler);
     this.streamHandler.addEnvironment(
       'EVENT_BUS_NAME',
@@ -116,7 +118,7 @@ export class AccountStack extends Stack {
         batchSize: 10,
       }),
     );
-    new CfnOutput(this, lowerCase(functionName), {
+    new CfnOutput(this, upperCase(functionName), {
       value: this.streamHandler.functionArn,
     });
   }
@@ -124,7 +126,7 @@ export class AccountStack extends Stack {
   buildConsumer(functionName: string, eventType: EventType) {
     const consumer = new NodejsFunction(this, lowerCase(eventType), {
       functionName: `${functionName}Consumer`,
-      entry: `events/${kebabCase(eventType)}.ts`,
+      entry: join(__dirname, 'events', `${kebabCase(eventType)}.ts`),
     });
 
     const accountEventRule = new Rule(this, `${camelCase(eventType)}Rule`, {
@@ -136,7 +138,7 @@ export class AccountStack extends Stack {
       eventBus: this.eventBus,
     });
     accountEventRule.addTarget(new LambdaFunction(consumer));
-    new CfnOutput(this, `${lowerCase(eventType)}-consumer`, {
+    new CfnOutput(this, `${upperCase(`${eventType}Consumer`)}`, {
       value: consumer.functionArn,
     });
   }
