@@ -203,6 +203,7 @@ export const getAccountList = async (pageSize = 3, token?: string) => {
     ExpressionAttributeNames: { '#gsi_pk': 'gsi_pk' },
     ExpressionAttributeValues: { ':gsi_pk': { S: 'account' } },
     Limit: pageSize,
+    ProjectionExpression: 'gsi_sk',
   });
 
   if (token) {
@@ -214,9 +215,11 @@ export const getAccountList = async (pageSize = 3, token?: string) => {
 
   console.log('getAccountList results: %j', accountResults);
 
-  const accounts = (accountResults.Items || []).map((account) =>
-    unmarshall(account),
-  ) as AccountListItemType[];
+  const accounts = (accountResults.Items || []).map((account) => {
+    const { gsi_sk: data } = unmarshall(account);
+    const [email, auth0Id, id] = data.split('#');
+    return { email, auth0Id, id };
+  }) as AccountListItemType[];
 
   if (!accounts || !accounts.length) {
     console.log('No accounts found');
