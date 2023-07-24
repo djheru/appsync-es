@@ -170,7 +170,7 @@ export const debitAccount = async (
  */
 export const formatEventItem = (item: AccountEvent, itemType = 'event') => ({
   pk: `${itemType}#${item.id}`,
-  sk: `${itemType}#${item.version}`,
+  sk: item.version,
   ...item,
 });
 
@@ -184,7 +184,7 @@ export const formatCreateItem = (
   itemType = 'event',
 ) => ({
   pk: `${itemType}#${item.id}`,
-  sk: `${itemType}#${item.version}`,
+  sk: item.version,
   gsi_pk: 'account',
   gsi_sk: `${item.email}#${item.auth0Id}#${item.id}`,
   ...item,
