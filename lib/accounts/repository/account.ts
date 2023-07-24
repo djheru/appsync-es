@@ -1,3 +1,4 @@
+// AWS SDK and utilities for DynamoDB operations
 import { DynamoDBClient, QueryCommand } from '@aws-sdk/client-dynamodb';
 import {
   DynamoDBDocumentClient,
@@ -19,6 +20,7 @@ import {
 
 const { TABLE_NAME: TableName = '' } = process.env;
 
+// https agent settings
 const agent = new https.Agent({
   keepAlive: true,
   maxSockets: 50,
@@ -29,19 +31,28 @@ agent.setMaxListeners(0);
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
 
+/**
+ * Function to create a new account. It performs three operations as a transaction:
+ * 1. Inserts a 'create' event.
+ * 2. Inserts an initial 'snapshot' event.
+ * 3. Inserts the account into the account list.
+ * @param createEvent the account creation event.
+ */
 export const createAccount = async (createEvent: CreateAccountEvent) => {
   const transaction: TransactWriteCommandInput = {
     TransactItems: [],
   };
 
+  // add create event
   transaction.TransactItems?.push({
     Put: {
       TableName,
-      ConditionExpression: 'attribute_not_exists(id)',
+      ConditionExpression: 'attribute_not_exists(pk)',
       Item: formatEventItem(createEvent),
     },
   });
 
+  // create initial snapshot event
   const accountSnapshot: AccountSnapshotEvent = {
     ...createEvent,
     version: 2,
@@ -51,11 +62,12 @@ export const createAccount = async (createEvent: CreateAccountEvent) => {
   transaction.TransactItems?.push({
     Put: {
       TableName,
-      ConditionExpression: 'attribute_not_exists(version)',
+      ConditionExpression: 'attribute_not_exists(sk)',
       Item: formatEventItem(accountSnapshot),
     },
   });
 
+  // add account to account list
   const accountListItem: AccountListItemType = {
     auth0Id: createEvent.auth0Id,
     email: createEvent.email,
@@ -71,9 +83,19 @@ export const createAccount = async (createEvent: CreateAccountEvent) => {
 
   const command = new TransactWriteCommand(transaction);
 
-  await ddb.send(command);
+  try {
+    await ddb.send(command);
+  } catch (error) {
+    console.error(`Failed to create account: ${error}`);
+    throw error;
+  }
 };
 
+/**
+ * Function to credit an account. It performs the credit operation as a transaction and inserts a snapshot event if needed.
+ * @param creditEvent the credit event.
+ * @param snapshotEvent the snapshot event if needed.
+ */
 export const creditAccount = async (
   creditEvent: CreditAccountEvent,
   snapshotEvent?: AccountSnapshotEvent,
@@ -82,29 +104,41 @@ export const creditAccount = async (
     TransactItems: [],
   };
 
+  // if snapshotEvent exists, push it to transaction
   if (snapshotEvent) {
     transaction.TransactItems?.push({
       Put: {
         TableName,
-        ConditionExpression: 'attribute_not_exists(version)',
+        ConditionExpression: 'attribute_not_exists(sk)',
         Item: formatEventItem(snapshotEvent),
       },
     });
   }
 
+  // push creditEvent to transaction
   transaction.TransactItems?.push({
     Put: {
       TableName,
-      ConditionExpression: 'attribute_not_exists(version)',
+      ConditionExpression: 'attribute_not_exists(sk)',
       Item: formatEventItem(creditEvent),
     },
   });
 
   const command = new TransactWriteCommand(transaction);
 
-  await ddb.send(command);
+  try {
+    await ddb.send(command);
+  } catch (error) {
+    console.error(`Failed to credit account: ${error}`);
+    throw error;
+  }
 };
 
+/**
+ * Function to debit an account. It performs the debit operation as a transaction and inserts a snapshot event if needed.
+ * @param debitEvent the debit event.
+ * @param snapshotEvent the snapshot event if needed.
+ */
 export const debitAccount = async (
   debitEvent: DebitAccountEvent,
   snapshotEvent?: AccountSnapshotEvent,
@@ -113,41 +147,62 @@ export const debitAccount = async (
     TransactItems: [],
   };
 
+  // if snapshotEvent exists, push it to transaction
   if (snapshotEvent) {
     transaction.TransactItems?.push({
       Put: {
         TableName,
-        ConditionExpression: 'attribute_not_exists(version)',
+        ConditionExpression: 'attribute_not_exists(sk)',
         Item: formatEventItem(snapshotEvent),
       },
     });
   }
 
+  // push debitEvent to transaction
   transaction.TransactItems?.push({
     Put: {
       TableName,
-      ConditionExpression: 'attribute_not_exists(version)',
+      ConditionExpression: 'attribute_not_exists(sk)',
       Item: formatEventItem(debitEvent),
     },
   });
 
   const command = new TransactWriteCommand(transaction);
 
-  await ddb.send(command);
+  try {
+    await ddb.send(command);
+  } catch (error) {
+    console.error(`Failed to debit account: ${error}`);
+    throw error;
+  }
 };
 
+/**
+ * Helper function to format event item for DynamoDB
+ * @param item the event item to be formatted
+ * @param itemType the type of the item
+ */
 export const formatEventItem = (item: AccountEvent, itemType = 'event') => ({
   pk: `${itemType}#${item.id}`,
   sk: `${itemType}#${item.version}`,
   ...item,
 });
 
+/**
+ * Helper function to format account list item for DynamoDB
+ * @param item the account list item to be formatted
+ */
 export const formatAccountListItem = (item: AccountListItemType) => ({
   pk: 'account',
   sk: `account#${item.email}`,
   ...item,
 });
 
+/**
+ * Function to get list of accounts in a paginated way
+ * @param pageSize the number of accounts to return per page
+ * @param token the token to specify a specific page
+ */
 export const getAccountList = async (pageSize = 3, token?: string) => {
   const command = new QueryCommand({
     TableName,
@@ -183,6 +238,10 @@ export const getAccountList = async (pageSize = 3, token?: string) => {
   return { accounts, nextToken };
 };
 
+/**
+ * Function to get list of account events
+ * @param id the ID of the account
+ */
 export const getAccountEvents = async (id: string) => {
   const command = new QueryCommand({
     TableName,
@@ -192,6 +251,7 @@ export const getAccountEvents = async (id: string) => {
     Limit: 10,
     ScanIndexForward: false, // most recent first
   });
+
   const stream = await ddb.send(command);
 
   const items = (stream.Items || []).map((item) =>
