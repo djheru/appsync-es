@@ -89,13 +89,20 @@ export class AccountStack extends Stack {
   buildTable(tableName: string) {
     this.table = new Table(this, `${camelCase(tableName)}Table`, {
       tableName,
-      partitionKey: { name: 'id', type: AttributeType.STRING },
-      sortKey: { name: 'version', type: AttributeType.NUMBER },
+      partitionKey: { name: 'pk', type: AttributeType.STRING },
+      sortKey: { name: 'sk', type: AttributeType.NUMBER },
       billingMode: BillingMode.PAY_PER_REQUEST,
       removalPolicy: RemovalPolicy.DESTROY,
       timeToLiveAttribute: 'expires',
       stream: StreamViewType.NEW_IMAGE,
     });
+
+    this.table.addGlobalSecondaryIndex({
+      indexName: `${tableName}GSI`,
+      partitionKey: { name: 'gsi_pk', type: AttributeType.STRING },
+      sortKey: { name: 'gsi_sk', type: AttributeType.STRING },
+    });
+
     this.table.grantReadWriteData(this.lambdaResolver);
     this.lambdaResolver.addEnvironment('TABLE_NAME', this.table.tableName);
   }

@@ -48,7 +48,7 @@ export const createAccount = async (createEvent: CreateAccountEvent) => {
     Put: {
       TableName,
       ConditionExpression: 'attribute_not_exists(pk)',
-      Item: formatEventItem(createEvent),
+      Item: formatCreateItem(createEvent),
     },
   });
 
@@ -64,20 +64,6 @@ export const createAccount = async (createEvent: CreateAccountEvent) => {
       TableName,
       ConditionExpression: 'attribute_not_exists(sk)',
       Item: formatEventItem(accountSnapshot),
-    },
-  });
-
-  // add account to account list
-  const accountListItem: AccountListItemType = {
-    auth0Id: createEvent.auth0Id,
-    email: createEvent.email,
-    id: createEvent.id,
-  };
-
-  transaction.TransactItems?.push({
-    Put: {
-      TableName,
-      Item: formatAccountListItem(accountListItem),
     },
   });
 
@@ -189,12 +175,18 @@ export const formatEventItem = (item: AccountEvent, itemType = 'event') => ({
 });
 
 /**
- * Helper function to format account list item for DynamoDB
+ * Helper function to format account creation item for DynamoDB
+ * It needs to also write to the GSI
  * @param item the account list item to be formatted
  */
-export const formatAccountListItem = (item: AccountListItemType) => ({
-  pk: 'account',
-  sk: `account#${item.email}`,
+export const formatCreateItem = (
+  item: CreateAccountEvent,
+  itemType = 'event',
+) => ({
+  pk: `${itemType}#${item.id}`,
+  sk: `${itemType}#${item.version}`,
+  gsi_pk: 'account',
+  gsi_sk: `${item.email}#${item.auth0Id}#${item.id}`,
   ...item,
 });
 
@@ -206,10 +198,10 @@ export const formatAccountListItem = (item: AccountListItemType) => ({
 export const getAccountList = async (pageSize = 3, token?: string) => {
   const command = new QueryCommand({
     TableName,
-    KeyConditionExpression: '#pk = :pk',
-    ExpressionAttributeNames: { '#pk': 'pk' },
-    ExpressionAttributeValues: { ':pk': { S: 'account' } },
-    ConsistentRead: true,
+    IndexName: `${TableName}GSI`,
+    KeyConditionExpression: '#gsi_pk = :gsi_pk',
+    ExpressionAttributeNames: { '#gsi_pk': 'gsi_pk' },
+    ExpressionAttributeValues: { ':gsi_pk': { S: 'account' } },
     Limit: pageSize,
   });
 
@@ -219,6 +211,8 @@ export const getAccountList = async (pageSize = 3, token?: string) => {
     );
   }
   const accountResults: QueryCommandOutput = await ddb.send(command);
+
+  console.log('getAccountList results: %j', accountResults);
 
   const accounts = (accountResults.Items || []).map((account) =>
     unmarshall(account),
